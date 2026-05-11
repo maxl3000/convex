@@ -2,6 +2,7 @@ import { ControlPanel } from "./components/ControlPanel";
 import { GridEditor } from "./components/GridEditor";
 import { OutputPanel } from "./components/OutputPanel";
 import { ShapePreview } from "./components/ShapePreview";
+import { StatesPanel } from "./components/StatesPanel";
 import { useGridState } from "./state/useGridState";
 
 export default function App() {
@@ -50,9 +51,21 @@ export default function App() {
           />
         </section>
 
+        <section className="panel panel-states">
+          <h2>States</h2>
+          <StatesPanel
+            snapshots={grid.snapshots}
+            activeIdx={grid.activeIdx}
+            onSelect={grid.selectState}
+            onAdd={grid.addState}
+            onDelete={grid.deleteState}
+            onRename={grid.renameState}
+          />
+        </section>
+
         <section className="panel panel-output">
           <h2>Output</h2>
-          <OutputPanel state={grid.state} />
+          <OutputPanel snapshots={grid.snapshots} activeIdx={grid.activeIdx} />
         </section>
       </main>
     </div>
