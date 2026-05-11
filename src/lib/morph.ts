@@ -77,13 +77,11 @@ export function buildGsapMorphSnippet(
 </svg>
 
 <!--
-  GSAP MorphSVGPlugin (Club GSAP — https://gsap.com/pricing/).
+  GSAP + MorphSVGPlugin (seit der Webflow-Übernahme 2024 kostenlos).
   Auf Webflow: Site Settings → Custom Code → vor </body> einfügen.
-  Die MorphSVGPlugin-URL unten ist die öffentliche CodePen-Trial-Version;
-  für Production-Sites verwendest du deine eigene Club-GSAP-CDN-URL.
 -->
 <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
-<script src="https://assets.codepen.io/16327/MorphSVGPlugin3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/MorphSVGPlugin.min.js"></script>
 <script>
   gsap.registerPlugin(MorphSVGPlugin);
 
