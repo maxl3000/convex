@@ -5,7 +5,7 @@ export function toSvgMarkup(
   options: { fill?: string; preserveAspectRatio?: string } = {},
 ): string {
   const fill = options.fill ?? "currentColor";
-  const par = options.preserveAspectRatio ?? "none";
+  const par = options.preserveAspectRatio ?? "xMidYMid meet";
   const { d, width, height } = result;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="${par}" width="100%" height="100%"><path d="${d}" fill="${fill}"/></svg>`;
 }
