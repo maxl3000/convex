@@ -19,16 +19,47 @@ export function OutputPanel({ state }: Props) {
   const [tab, setTab] = useState<TabId>("svg");
   const [copied, setCopied] = useState(false);
 
-  const result = useMemo(
-    () =>
-      generatePath({
+  const sourceW = useMemo(
+    () => state.columnWidths.reduce((a, b) => a + b, 0),
+    [state.columnWidths],
+  );
+  const sourceH = useMemo(
+    () => state.rowHeights.reduce((a, b) => a + b, 0),
+    [state.rowHeights],
+  );
+
+  const [customSize, setCustomSize] = useState(false);
+  const [exportW, setExportW] = useState<number>(sourceW);
+  const [exportH, setExportH] = useState<number>(sourceH);
+
+  const result = useMemo(() => {
+    if (!customSize || sourceW === 0 || sourceH === 0) {
+      return generatePath({
         cells: state.cells,
         columnWidths: state.columnWidths,
         rowHeights: state.rowHeights,
         radius: state.radius,
-      }),
-    [state.cells, state.columnWidths, state.rowHeights, state.radius],
-  );
+      });
+    }
+    const scaleW = exportW / sourceW;
+    const scaleH = exportH / sourceH;
+    return generatePath({
+      cells: state.cells,
+      columnWidths: state.columnWidths.map((w) => w * scaleW),
+      rowHeights: state.rowHeights.map((h) => h * scaleH),
+      radius: state.radius,
+    });
+  }, [
+    customSize,
+    state.cells,
+    state.columnWidths,
+    state.rowHeights,
+    state.radius,
+    sourceW,
+    sourceH,
+    exportW,
+    exportH,
+  ]);
 
   const text = useMemo(() => {
     if (!result.d) return "";
@@ -70,6 +101,47 @@ export function OutputPanel({ state }: Props) {
             {t.label}
           </button>
         ))}
+      </div>
+      <div className="export-size">
+        <label className="checkbox">
+          <input
+            type="checkbox"
+            checked={customSize}
+            onChange={(e) => setCustomSize(e.target.checked)}
+          />
+          Export-Größe anpassen (viewBox)
+        </label>
+        {customSize && (
+          <div className="export-size-inputs">
+            <label>
+              Breite
+              <input
+                type="number"
+                min={1}
+                value={exportW}
+                onChange={(e) => setExportW(Math.max(1, Number(e.target.value) || 1))}
+              />
+            </label>
+            <label>
+              Höhe
+              <input
+                type="number"
+                min={1}
+                value={exportH}
+                onChange={(e) => setExportH(Math.max(1, Number(e.target.value) || 1))}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                setExportW(sourceW);
+                setExportH(sourceH);
+              }}
+            >
+              Auf Quelle zurücksetzen
+            </button>
+          </div>
+        )}
       </div>
       <textarea readOnly value={text} placeholder="Keine Form ausgewählt" />
       <div className="output-actions">
