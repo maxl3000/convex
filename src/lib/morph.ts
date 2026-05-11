@@ -59,7 +59,7 @@ ${keyframes}
 </svg>`;
 }
 
-export function buildFlubberSnippet(
+export function buildGsapMorphSnippet(
   results: PathResult[],
   options: AnimationOptions,
 ): string {
@@ -69,38 +69,32 @@ export function buildFlubberSnippet(
   if (paths.length === 0) return "";
 
   const pathsJson = JSON.stringify(paths, null, 2);
-  const durMs = Math.round(duration * 1000);
+  const perStep = (duration / paths.length).toFixed(2);
 
   return `<!-- HTML -->
 <svg id="convex-morph" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" width="100%" height="100%">
   <path fill="${fill}" d="${paths[0]}"/>
 </svg>
 
-<!-- JS: requires flubber (https://github.com/veltman/flubber) -->
-<script type="module">
-import { interpolate } from "https://cdn.skypack.dev/flubber";
+<!--
+  GSAP MorphSVGPlugin (Club GSAP — https://gsap.com/pricing/).
+  Auf Webflow: Site Settings → Custom Code → vor </body> einfügen.
+  Die MorphSVGPlugin-URL unten ist die öffentliche CodePen-Trial-Version;
+  für Production-Sites verwendest du deine eigene Club-GSAP-CDN-URL.
+-->
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+<script src="https://assets.codepen.io/16327/MorphSVGPlugin3.min.js"></script>
+<script>
+  gsap.registerPlugin(MorphSVGPlugin);
 
-const paths = ${pathsJson};
-const el = document.querySelector("#convex-morph path");
-const duration = ${durMs};
-const hold = 400;
-let i = 0;
+  const paths = ${pathsJson};
+  const target = "#convex-morph path";
+  const stepDuration = ${perStep};
 
-function step() {
-  const next = (i + 1) % paths.length;
-  const interp = interpolate(paths[i], paths[next], { maxSegmentLength: 6 });
-  const t0 = performance.now();
-  function frame(now) {
-    const t = Math.min(1, (now - t0) / duration);
-    el.setAttribute("d", interp(t));
-    if (t < 1) requestAnimationFrame(frame);
-    else {
-      i = next;
-      setTimeout(step, hold);
-    }
+  const tl = gsap.timeline({ repeat: -1 });
+  for (let i = 1; i < paths.length; i++) {
+    tl.to(target, { morphSVG: paths[i], duration: stepDuration, ease: "power2.inOut" });
   }
-  requestAnimationFrame(frame);
-}
-step();
+  tl.to(target, { morphSVG: paths[0], duration: stepDuration, ease: "power2.inOut" });
 </script>`;
 }

@@ -4,7 +4,7 @@ import { downloadSvg, toCssClipPath, toPathD, toSvgMarkup } from "../lib/output"
 import {
   areMorphCompatible,
   buildCssKeyframesSvg,
-  buildFlubberSnippet,
+  buildGsapMorphSnippet,
 } from "../lib/morph";
 import type { StateSnapshot } from "../state/useGridState";
 
@@ -97,7 +97,7 @@ export function OutputPanel({ snapshots, activeIdx }: Props) {
       if (cssCompatible) {
         return buildCssKeyframesSvg(animResults, { duration });
       }
-      return buildFlubberSnippet(animResults, { duration });
+      return buildGsapMorphSnippet(animResults, { duration });
     }
     if (!result.d) return "";
     switch (tab) {
@@ -160,7 +160,7 @@ export function OutputPanel({ snapshots, activeIdx }: Props) {
               ? `${animPaths.length}/2+ States`
               : cssCompatible
                 ? "CSS-Keyframes (gleiche Topologie)"
-                : "JS / Flubber (unterschiedliche Topologie)"}
+                : "GSAP MorphSVG (unterschiedliche Topologie)"}
           </span>
         </div>
       ) : (
