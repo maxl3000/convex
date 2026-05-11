@@ -1,23 +1,33 @@
 import { useMemo, useState } from "react";
 import { generatePath } from "../lib/pathGenerator";
 import { downloadSvg, toCssClipPath, toPathD, toSvgMarkup } from "../lib/output";
-import type { GridState } from "../types";
+import {
+  areMorphCompatible,
+  buildCssKeyframesSvg,
+  buildFlubberSnippet,
+} from "../lib/morph";
+import type { StateSnapshot } from "../state/useGridState";
 
 type Props = {
-  state: GridState;
+  snapshots: StateSnapshot[];
+  activeIdx: number;
 };
 
-type TabId = "svg" | "css" | "d";
+type TabId = "svg" | "css" | "d" | "anim";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "svg", label: "SVG (Webflow Embed)" },
   { id: "css", label: "CSS clip-path" },
   { id: "d", label: "Pfad d" },
+  { id: "anim", label: "Animation" },
 ];
 
-export function OutputPanel({ state }: Props) {
+export function OutputPanel({ snapshots, activeIdx }: Props) {
   const [tab, setTab] = useState<TabId>("svg");
   const [copied, setCopied] = useState(false);
+  const [duration, setDuration] = useState<number>(3);
+
+  const state = snapshots[activeIdx].grid;
 
   const sourceW = useMemo(
     () => state.columnWidths.reduce((a, b) => a + b, 0),
@@ -61,7 +71,34 @@ export function OutputPanel({ state }: Props) {
     exportH,
   ]);
 
+  const animResults = useMemo(
+    () =>
+      snapshots.map((s) =>
+        generatePath({
+          cells: s.grid.cells,
+          columnWidths: s.grid.columnWidths,
+          rowHeights: s.grid.rowHeights,
+          radius: s.grid.radius,
+        }),
+      ),
+    [snapshots],
+  );
+
+  const animPaths = useMemo(
+    () => animResults.map((r) => r.d).filter(Boolean),
+    [animResults],
+  );
+
+  const cssCompatible = useMemo(() => areMorphCompatible(animPaths), [animPaths]);
+
   const text = useMemo(() => {
+    if (tab === "anim") {
+      if (animPaths.length < 2) return "// Mindestens 2 States nötig für Animation.";
+      if (cssCompatible) {
+        return buildCssKeyframesSvg(animResults, { duration });
+      }
+      return buildFlubberSnippet(animResults, { duration });
+    }
     if (!result.d) return "";
     switch (tab) {
       case "svg":
@@ -71,7 +108,8 @@ export function OutputPanel({ state }: Props) {
       case "d":
         return toPathD(result);
     }
-  }, [tab, result]);
+    return "";
+  }, [tab, result, animResults, animPaths, cssCompatible, duration]);
 
   const handleCopy = async () => {
     if (!text) return;
@@ -102,55 +140,87 @@ export function OutputPanel({ state }: Props) {
           </button>
         ))}
       </div>
-      <div className="export-size">
-        <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={customSize}
-            onChange={(e) => setCustomSize(e.target.checked)}
-          />
-          Export-Größe anpassen (viewBox)
-        </label>
-        {customSize && (
-          <div className="export-size-inputs">
-            <label>
-              Breite
-              <input
-                type="number"
-                min={1}
-                value={exportW}
-                onChange={(e) => setExportW(Math.max(1, Number(e.target.value) || 1))}
-              />
-            </label>
-            <label>
-              Höhe
-              <input
-                type="number"
-                min={1}
-                value={exportH}
-                onChange={(e) => setExportH(Math.max(1, Number(e.target.value) || 1))}
-              />
-            </label>
-            <button
-              type="button"
-              onClick={() => {
-                setExportW(sourceW);
-                setExportH(sourceH);
-              }}
-            >
-              Auf Quelle zurücksetzen
-            </button>
-          </div>
-        )}
-      </div>
+
+      {tab === "anim" ? (
+        <div className="anim-controls">
+          <label>
+            Dauer (s)
+            <input
+              type="number"
+              min={0.1}
+              step={0.1}
+              value={duration}
+              onChange={(e) =>
+                setDuration(Math.max(0.1, Number(e.target.value) || 0.1))
+              }
+            />
+          </label>
+          <span className={`anim-mode ${cssCompatible ? "ok" : "warn"}`}>
+            {animPaths.length < 2
+              ? `${animPaths.length}/2+ States`
+              : cssCompatible
+                ? "CSS-Keyframes (gleiche Topologie)"
+                : "JS / Flubber (unterschiedliche Topologie)"}
+          </span>
+        </div>
+      ) : (
+        <div className="export-size">
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={customSize}
+              onChange={(e) => setCustomSize(e.target.checked)}
+            />
+            Export-Größe anpassen (viewBox)
+          </label>
+          {customSize && (
+            <div className="export-size-inputs">
+              <label>
+                Breite
+                <input
+                  type="number"
+                  min={1}
+                  value={exportW}
+                  onChange={(e) =>
+                    setExportW(Math.max(1, Number(e.target.value) || 1))
+                  }
+                />
+              </label>
+              <label>
+                Höhe
+                <input
+                  type="number"
+                  min={1}
+                  value={exportH}
+                  onChange={(e) =>
+                    setExportH(Math.max(1, Number(e.target.value) || 1))
+                  }
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setExportW(sourceW);
+                  setExportH(sourceH);
+                }}
+              >
+                Auf Quelle zurücksetzen
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       <textarea readOnly value={text} placeholder="Keine Form ausgewählt" />
       <div className="output-actions">
         <button onClick={handleCopy} disabled={!text}>
           {copied ? "Kopiert ✓" : "In Zwischenablage"}
         </button>
-        <button onClick={handleDownload} disabled={!result.d}>
-          SVG herunterladen
-        </button>
+        {tab !== "anim" && (
+          <button onClick={handleDownload} disabled={!result.d}>
+            SVG herunterladen
+          </button>
+        )}
       </div>
     </div>
   );

@@ -103,7 +103,7 @@ textarea {
 .app-grid {
   display: grid;
   grid-template-columns: 2fr 1fr;
-  grid-template-rows: auto auto;
+  grid-template-rows: auto auto auto;
   gap: 16px;
 }
 
@@ -126,13 +126,18 @@ textarea {
 .panel-editor { grid-column: 1; grid-row: 1; }
 .panel-preview { grid-column: 1; grid-row: 2; }
 .panel-controls { grid-column: 2; grid-row: 1; }
-.panel-output { grid-column: 2; grid-row: 2; }
+.panel-states { grid-column: 2; grid-row: 2; }
+.panel-output { grid-column: 1 / -1; grid-row: 3; }
 
 @media (max-width: 900px) {
   .app-grid {
     grid-template-columns: 1fr;
   }
-  .panel-editor, .panel-preview, .panel-controls, .panel-output {
+  .panel-editor,
+  .panel-preview,
+  .panel-controls,
+  .panel-states,
+  .panel-output {
     grid-column: 1;
     grid-row: auto;
   }
@@ -329,4 +334,118 @@ label.checkbox {
 
 .export-size-inputs input {
   width: 80px;
+}
+
+.states {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.states-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.state-card {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.state-card:hover {
+  border-color: var(--accent);
+}
+
+.state-card.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.state-thumb {
+  width: 56px;
+  height: 42px;
+  background: var(--bg);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  overflow: hidden;
+}
+
+.state-thumb svg {
+  width: 100%;
+  height: 100%;
+  padding: 4px;
+}
+
+.state-thumb-empty {
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.state-name {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  padding: 4px 6px;
+  border-radius: 4px;
+  min-width: 0;
+}
+
+.state-name:focus {
+  outline: none;
+  background: var(--bg);
+}
+
+.state-delete {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.state-add {
+  margin-top: 4px;
+}
+
+.anim-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+
+.anim-controls label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.anim-mode {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.anim-mode.ok {
+  background: rgba(46, 160, 67, 0.18);
+  color: #4ade80;
+}
+
+.anim-mode.warn {
+  background: rgba(218, 165, 32, 0.18);
+  color: #fbbf24;
 }

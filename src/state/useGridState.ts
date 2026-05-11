@@ -14,7 +14,25 @@ function uniformWidths(count: number, total: number): number[] {
   return Array(count).fill(total / count);
 }
 
-function buildInitial(): GridState {
+export type StateSnapshot = {
+  id: string;
+  name: string;
+  grid: GridState;
+};
+
+function cloneGrid(g: GridState): GridState {
+  return {
+    cols: g.cols,
+    rows: g.rows,
+    columnWidths: [...g.columnWidths],
+    rowHeights: [...g.rowHeights],
+    cells: g.cells.map((row) => [...row]),
+    radius: g.radius,
+    uniformMode: g.uniformMode,
+  };
+}
+
+function buildInitialGrid(): GridState {
   return {
     cols: DEFAULT_COLS,
     rows: DEFAULT_ROWS,
@@ -26,8 +44,21 @@ function buildInitial(): GridState {
   };
 }
 
+let idCounter = 0;
+function nextId(): string {
+  idCounter += 1;
+  return `s${Date.now().toString(36)}${idCounter}`;
+}
+
+function buildInitialSnapshots(): StateSnapshot[] {
+  return [{ id: nextId(), name: "State 1", grid: buildInitialGrid() }];
+}
+
 export function useGridState() {
-  const [state, setState] = useState<GridState>(buildInitial);
+  const [snapshots, setSnapshots] = useState<StateSnapshot[]>(buildInitialSnapshots);
+  const [activeIdx, setActiveIdx] = useState(0);
+
+  const state = snapshots[activeIdx]?.grid ?? buildInitialGrid();
 
   const totalWidth = useMemo(
     () => state.columnWidths.reduce((a, b) => a + b, 0),
@@ -38,124 +69,196 @@ export function useGridState() {
     [state.rowHeights],
   );
 
-  const toggleCell = useCallback((r: number, c: number) => {
-    setState((s) => {
-      const cells = s.cells.map((row, ri) =>
-        ri === r ? row.map((v, ci) => (ci === c ? !v : v)) : row,
+  const updateActive = useCallback(
+    (mut: (g: GridState) => GridState) => {
+      setSnapshots((prev) =>
+        prev.map((s, i) => (i === activeIdx ? { ...s, grid: mut(s.grid) } : s)),
       );
-      return { ...s, cells };
-    });
-  }, []);
+    },
+    [activeIdx],
+  );
 
-  const setCell = useCallback((r: number, c: number, value: boolean) => {
-    setState((s) => {
-      if (s.cells[r][c] === value) return s;
-      const cells = s.cells.map((row, ri) =>
-        ri === r ? row.map((v, ci) => (ci === c ? value : v)) : row,
-      );
-      return { ...s, cells };
-    });
-  }, []);
+  const toggleCell = useCallback(
+    (r: number, c: number) => {
+      updateActive((g) => ({
+        ...g,
+        cells: g.cells.map((row, ri) =>
+          ri === r ? row.map((v, ci) => (ci === c ? !v : v)) : row,
+        ),
+      }));
+    },
+    [updateActive],
+  );
 
-  const setCols = useCallback((cols: number) => {
-    setState((s) => {
-      const clamped = Math.max(1, Math.min(30, cols));
-      if (clamped === s.cols) return s;
-      const newCells = makeCells(s.rows, clamped, false);
-      for (let r = 0; r < s.rows; r++) {
-        for (let c = 0; c < Math.min(clamped, s.cols); c++) {
-          newCells[r][c] = s.cells[r][c];
-        }
-      }
-      const total = s.columnWidths.reduce((a, b) => a + b, 0);
-      return {
-        ...s,
-        cols: clamped,
-        cells: newCells,
-        columnWidths: uniformWidths(clamped, total),
-      };
-    });
-  }, []);
-
-  const setRows = useCallback((rows: number) => {
-    setState((s) => {
-      const clamped = Math.max(1, Math.min(30, rows));
-      if (clamped === s.rows) return s;
-      const newCells = makeCells(clamped, s.cols, false);
-      for (let r = 0; r < Math.min(clamped, s.rows); r++) {
-        for (let c = 0; c < s.cols; c++) {
-          newCells[r][c] = s.cells[r][c];
-        }
-      }
-      const total = s.rowHeights.reduce((a, b) => a + b, 0);
-      return {
-        ...s,
-        rows: clamped,
-        cells: newCells,
-        rowHeights: uniformWidths(clamped, total),
-      };
-    });
-  }, []);
-
-  const setRadius = useCallback((radius: number) => {
-    setState((s) => ({ ...s, radius: Math.max(0, radius) }));
-  }, []);
-
-  const setUniformMode = useCallback((uniformMode: boolean) => {
-    setState((s) => {
-      if (uniformMode === s.uniformMode) return s;
-      if (uniformMode) {
-        const tw = s.columnWidths.reduce((a, b) => a + b, 0);
-        const th = s.rowHeights.reduce((a, b) => a + b, 0);
+  const setCell = useCallback(
+    (r: number, c: number, value: boolean) => {
+      updateActive((g) => {
+        if (g.cells[r][c] === value) return g;
         return {
-          ...s,
-          uniformMode: true,
-          columnWidths: uniformWidths(s.cols, tw),
-          rowHeights: uniformWidths(s.rows, th),
+          ...g,
+          cells: g.cells.map((row, ri) =>
+            ri === r ? row.map((v, ci) => (ci === c ? value : v)) : row,
+          ),
         };
-      }
-      return { ...s, uniformMode: false };
-    });
-  }, []);
+      });
+    },
+    [updateActive],
+  );
 
-  const setColumnWidth = useCallback((idx: number, width: number) => {
-    setState((s) => {
-      const widths = [...s.columnWidths];
-      const neighbor = idx + 1 < widths.length ? idx + 1 : idx - 1;
-      const minSize = 20;
-      const combined = widths[idx] + widths[neighbor];
-      const clamped = Math.max(minSize, Math.min(combined - minSize, width));
-      widths[idx] = clamped;
-      widths[neighbor] = combined - clamped;
-      return { ...s, columnWidths: widths };
-    });
-  }, []);
+  const setCols = useCallback(
+    (cols: number) => {
+      updateActive((g) => {
+        const clamped = Math.max(1, Math.min(30, cols));
+        if (clamped === g.cols) return g;
+        const newCells = makeCells(g.rows, clamped, false);
+        for (let r = 0; r < g.rows; r++) {
+          for (let c = 0; c < Math.min(clamped, g.cols); c++) {
+            newCells[r][c] = g.cells[r][c];
+          }
+        }
+        const total = g.columnWidths.reduce((a, b) => a + b, 0);
+        return {
+          ...g,
+          cols: clamped,
+          cells: newCells,
+          columnWidths: uniformWidths(clamped, total),
+        };
+      });
+    },
+    [updateActive],
+  );
 
-  const setRowHeight = useCallback((idx: number, height: number) => {
-    setState((s) => {
-      const heights = [...s.rowHeights];
-      const neighbor = idx + 1 < heights.length ? idx + 1 : idx - 1;
-      const minSize = 20;
-      const combined = heights[idx] + heights[neighbor];
-      const clamped = Math.max(minSize, Math.min(combined - minSize, height));
-      heights[idx] = clamped;
-      heights[neighbor] = combined - clamped;
-      return { ...s, rowHeights: heights };
-    });
-  }, []);
+  const setRows = useCallback(
+    (rows: number) => {
+      updateActive((g) => {
+        const clamped = Math.max(1, Math.min(30, rows));
+        if (clamped === g.rows) return g;
+        const newCells = makeCells(clamped, g.cols, false);
+        for (let r = 0; r < Math.min(clamped, g.rows); r++) {
+          for (let c = 0; c < g.cols; c++) {
+            newCells[r][c] = g.cells[r][c];
+          }
+        }
+        const total = g.rowHeights.reduce((a, b) => a + b, 0);
+        return {
+          ...g,
+          rows: clamped,
+          cells: newCells,
+          rowHeights: uniformWidths(clamped, total),
+        };
+      });
+    },
+    [updateActive],
+  );
+
+  const setRadius = useCallback(
+    (radius: number) => {
+      updateActive((g) => ({ ...g, radius: Math.max(0, radius) }));
+    },
+    [updateActive],
+  );
+
+  const setUniformMode = useCallback(
+    (uniformMode: boolean) => {
+      updateActive((g) => {
+        if (uniformMode === g.uniformMode) return g;
+        if (uniformMode) {
+          const tw = g.columnWidths.reduce((a, b) => a + b, 0);
+          const th = g.rowHeights.reduce((a, b) => a + b, 0);
+          return {
+            ...g,
+            uniformMode: true,
+            columnWidths: uniformWidths(g.cols, tw),
+            rowHeights: uniformWidths(g.rows, th),
+          };
+        }
+        return { ...g, uniformMode: false };
+      });
+    },
+    [updateActive],
+  );
+
+  const setColumnWidth = useCallback(
+    (idx: number, width: number) => {
+      updateActive((g) => {
+        const widths = [...g.columnWidths];
+        const neighbor = idx + 1 < widths.length ? idx + 1 : idx - 1;
+        const minSize = 20;
+        const combined = widths[idx] + widths[neighbor];
+        const clamped = Math.max(minSize, Math.min(combined - minSize, width));
+        widths[idx] = clamped;
+        widths[neighbor] = combined - clamped;
+        return { ...g, columnWidths: widths };
+      });
+    },
+    [updateActive],
+  );
+
+  const setRowHeight = useCallback(
+    (idx: number, height: number) => {
+      updateActive((g) => {
+        const heights = [...g.rowHeights];
+        const neighbor = idx + 1 < heights.length ? idx + 1 : idx - 1;
+        const minSize = 20;
+        const combined = heights[idx] + heights[neighbor];
+        const clamped = Math.max(minSize, Math.min(combined - minSize, height));
+        heights[idx] = clamped;
+        heights[neighbor] = combined - clamped;
+        return { ...g, rowHeights: heights };
+      });
+    },
+    [updateActive],
+  );
 
   const clearCells = useCallback(() => {
-    setState((s) => ({ ...s, cells: makeCells(s.rows, s.cols, false) }));
-  }, []);
+    updateActive((g) => ({ ...g, cells: makeCells(g.rows, g.cols, false) }));
+  }, [updateActive]);
 
   const fillCells = useCallback(() => {
-    setState((s) => ({ ...s, cells: makeCells(s.rows, s.cols, true) }));
+    updateActive((g) => ({ ...g, cells: makeCells(g.rows, g.cols, true) }));
+  }, [updateActive]);
+
+  const addState = useCallback(() => {
+    setSnapshots((prev) => {
+      const base = prev[activeIdx]?.grid ?? buildInitialGrid();
+      return [
+        ...prev,
+        { id: nextId(), name: `State ${prev.length + 1}`, grid: cloneGrid(base) },
+      ];
+    });
+    setActiveIdx(snapshots.length);
+  }, [activeIdx, snapshots.length]);
+
+  const deleteState = useCallback(
+    (idx: number) => {
+      setSnapshots((prev) => {
+        if (prev.length <= 1) return prev;
+        return prev.filter((_, i) => i !== idx);
+      });
+      setActiveIdx((cur) => {
+        if (snapshots.length <= 1) return cur;
+        if (cur > idx) return cur - 1;
+        if (cur === idx) return Math.max(0, cur - 1);
+        return cur;
+      });
+    },
+    [snapshots.length],
+  );
+
+  const selectState = useCallback((idx: number) => {
+    setActiveIdx(idx);
+  }, []);
+
+  const renameState = useCallback((idx: number, name: string) => {
+    setSnapshots((prev) => prev.map((s, i) => (i === idx ? { ...s, name } : s)));
   }, []);
 
   return {
     state,
     totalWidth,
     totalHeight,
+    snapshots,
+    activeIdx,
     toggleCell,
     setCell,
     setCols,
@@ -166,5 +269,9 @@ export function useGridState() {
     setRowHeight,
     clearCells,
     fillCells,
+    addState,
+    deleteState,
+    selectState,
+    renameState,
   };
 }
